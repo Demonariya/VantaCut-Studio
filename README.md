@@ -23,7 +23,7 @@ npm run tauri -- dev
 npm run tauri -- build --bundles nsis
 ```
 
-The Tauri shell and Windows bundle configuration are present, but a native build has not been validated in this container. Its environment has no Rust/Cargo or WebKitGTK. The native Rust shell currently hosts the frontend; it does not yet own the project model or render jobs.
+The Tauri shell and Windows bundle configuration are present. A Windows x64 GNU GUI executable was cross-compiled in this container with a user-local Rust/MinGW toolchain; it has not been run on Windows. The portable output is `release/windows-x64/VantaCut-Studio.exe` plus its required `WebView2Loader.dll`, or `release/VantaCut-Studio-Windows-x64.zip`. The Windows NSIS setup package was not produced because the Linux NSIS build expects its default stub under `/usr/share/nsis`. The native Rust shell currently hosts the frontend; it does not yet own the project model or render jobs.
 
 ## Editing Workflow
 
@@ -55,7 +55,7 @@ npm run build
 npm run test:e2e
 ```
 
-The timeline suite currently covers rational frame calculations, split/source continuity, trims, move/undo/redo, ripple delete, locked tracks, source bounds, and valid media track placement. In the implementation environment, lint, the production frontend build, all 9 timeline tests, and both Playwright tests pass. Chromium used Linux libraries extracted into a user-local cache; no system packages were installed. The Tauri CLI confirms that Rust/Cargo, WebKitGTK, and librsvg are absent, so a native build and Windows installer could not be produced or tested here.
+The timeline suite currently covers rational frame calculations, split/source continuity, trims, move/undo/redo, ripple delete, locked tracks, source bounds, and valid media track placement. In the implementation environment, lint, the production frontend build, all 9 timeline tests, and both Playwright tests pass. Chromium used Linux libraries extracted into a user-local cache; no system packages were installed. The Windows executable was cross-compiled, but the application could not be launched on Windows in this environment, and no NSIS installer was produced.
 
 ## Media Engine And Licensing
 
