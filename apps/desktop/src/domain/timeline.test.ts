@@ -90,6 +90,59 @@ describe('frame-accurate timeline model', () => {
 
   it('rejects clips on a track with the wrong media kind', () => {
     const project = projectWithClip()
-    expect(applyCommand(project, { type: 'add-clip', clip: { ...clip, id: 'bad-kind', trackId: 'a1' } })).toBe(project)
+    const audioAsset = { ...project.assets[0], id: 'image-asset', kind: 'image' as const }
+    project.assets.push(audioAsset)
+    expect(applyCommand(project, { type: 'add-clip', clip: { ...clip, id: 'bad-kind', assetId: audioAsset.id, trackId: 'a1' } })).toBe(project)
+  })
+
+  it('adds linked video and audio clips as one valid command', () => {
+    const project = projectWithClip()
+    const videoClip = { ...clip, id: 'linked-video', linkGroupId: 'link-1' }
+    const audioClip = { ...clip, id: 'linked-audio', trackId: 'a1', linkGroupId: 'link-1' }
+    const result = applyCommand(project, { type: 'add-clips', clips: [videoClip, audioClip] })
+    expect(result.clips).toHaveLength(3)
+    expect(result.clips.filter((item) => item.linkGroupId === 'link-1')).toHaveLength(2)
+  })
+
+  it('splits linked video and audio clips together at one frame', () => {
+    const project = projectWithClip()
+    const videoClip = { ...clip, linkGroupId: 'link-1' }
+    const audioClip = { ...clip, id: 'clip-audio', trackId: 'a1', linkGroupId: 'link-1' }
+    project.clips = [videoClip, audioClip]
+    const result = applyCommand(project, {
+      type: 'split-clip',
+      clipId: videoClip.id,
+      atFrame: 108,
+      rightClipId: 'video-right',
+      rightClipIds: { 'clip-audio': 'audio-right' },
+    })
+    expect(result.clips).toHaveLength(4)
+    expect(result.clips.filter((item) => item.linkGroupId === 'link-1').map((item) => [item.trackId, item.startFrame, item.durationFrames]))
+      .toEqual([['v1', 48, 60], ['a1', 48, 60], ['v1', 108, 60], ['a1', 108, 60]])
+  })
+
+  it('persists clip gain and mute and track mute/solo through editing commands', () => {
+    const project = projectWithClip()
+    const gained = applyCommand(project, { type: 'update-clip', clipId: 'clip-1', values: { volume: 0.4, muted: true } })
+    expect(gained.clips[0]).toMatchObject({ volume: 0.4, muted: true })
+    const trackState = applyCommand(gained, { type: 'update-track', trackId: 'a1', values: { muted: true, solo: true } })
+    expect(trackState.tracks.find((track) => track.id === 'a1')).toMatchObject({ muted: true, solo: true })
+  })
+
+  it('adds and removes tracks without deleting source assets', () => {
+    const project = projectWithClip()
+    const withTrack = applyCommand(project, { type: 'add-track', track: { id: 'a2', name: 'A2', kind: 'audio', locked: false, muted: false, solo: false, hidden: false } })
+    expect(withTrack.tracks).toHaveLength(4)
+    const withoutTrack = applyCommand(withTrack, { type: 'remove-track', trackId: 'a2' })
+    expect(withoutTrack.tracks).toHaveLength(3)
+    expect(withoutTrack.assets).toHaveLength(1)
+    expect(applyCommand(project, { type: 'remove-track', trackId: 'a1' })).toBe(project)
+  })
+
+  it('does not remove source assets that clips still reference', () => {
+    const project = projectWithClip()
+    expect(applyCommand(project, { type: 'remove-asset', assetId: 'asset-1' })).toBe(project)
+    const unused = { ...project, clips: [] }
+    expect(applyCommand(unused, { type: 'remove-asset', assetId: 'asset-1' }).assets).toHaveLength(0)
   })
 })

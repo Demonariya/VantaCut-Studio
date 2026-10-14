@@ -126,6 +126,9 @@ input[type='range'] { width: 100%; height: 14px; margin: 5px 0 0; accent-color: 
 .inspector-empty-mark { width: 38px; height: 38px; margin-bottom: 11px; display: grid; place-items: center; border: 1px solid #373f3b; border-radius: 50%; color: #a8c967; background: #20251f; }
 .inspector-empty strong { color: #d4d8d6; font-size: 10px; font-weight: 640; }
 .inspector-empty span { max-width: 178px; margin-top: 5px; color: #818a8d; font-size: 9px; line-height: 1.55; }
+.audio-source { display: none; }
+.audio-inspector-state { display: flex; align-items: center; gap: 8px; color: #b8b9e4; font-size: 9px; }
+.audio-inspector-state button { margin-left: auto; }
 .timeline-toolbar { height: 39px; flex: 0 0 39px; padding: 0 10px 0 13px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2b3031; }
 .timeline-tools-left { height: 100%; gap: 8px; }
 .timeline-separator { height: 15px; margin: 0 3px; }
@@ -202,6 +205,30 @@ input[type='range'] { width: 100%; height: 14px; margin: 5px 0 0; accent-color: 
 .dialog-secondary:hover { background: #303638; }
 .dialog-primary { border-color: #b8d965; color: #1b2114; background: var(--acid); font-weight: 690; }
 .dialog-primary:hover { background: #d6f58b; }
+.editor-context-menu { position: fixed; z-index: 30; min-width: 196px; max-width: min(280px, calc(100vw - 16px)); padding: 4px; border: 1px solid #41494a; border-radius: 4px; background: #202426; box-shadow: 0 10px 30px #0009; animation: dialog-enter .1s ease-out both; }
+.editor-context-menu > div > button { width: 100%; min-height: 29px; padding: 0 8px; display: flex; align-items: center; justify-content: space-between; gap: 22px; border: 0; border-radius: 2px; color: #cdd2d1; background: transparent; font-size: 10px; text-align: left; cursor: pointer; }
+.editor-context-menu > div > button:hover:not(:disabled), .editor-context-menu > div > button:focus-visible { color: #f2f4f1; background: #303638; outline: 0; }
+.editor-context-menu > div > button:disabled { color: #687174; opacity: .58; }
+.editor-context-menu kbd { color: #858f91; font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 8px; white-space: nowrap; }
+.context-menu-separator { height: 1px; margin: 4px 5px; background: #353c3e; }
+.export-workspace { max-height: calc(100dvh - 36px); overflow-y: auto; }
+.export-workspace > p { margin-bottom: 12px; }
+.export-field { display: flex; margin-top: 11px; flex-direction: column; gap: 6px; color: #899294; font-size: 8px; font-weight: 700; }
+.export-field input, .export-field select { width: 100%; height: 31px; padding: 0 8px; border: 1px solid #3a4244; border-radius: 3px; color: #e0e3e1; background: #151819; font-size: 10px; }
+.export-field input[readonly] { color: #aab3b3; }
+.export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.export-check { display: flex; margin-top: 13px; align-items: center; gap: 7px; color: #bec5c4; font-size: 9px; cursor: pointer; }
+.export-check input { width: 13px; height: 13px; margin: 0; accent-color: var(--acid); }
+.export-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 12px; margin-top: 13px; padding: 10px; border: 1px solid #373f40; border-radius: 3px; background: #1a1e1f; }
+.export-summary span { color: #7e898b; font-size: 7px; font-weight: 700; }
+.export-summary strong { color: #ccd2d0; font-size: 9px; font-weight: 550; }
+.export-progress { margin-top: 14px; }
+.export-progress-label { display: flex; align-items: center; justify-content: space-between; color: #aab3b2; font-size: 9px; }
+.export-progress-label strong { color: #d9ef9b; font-family: 'Cascadia Code', 'Consolas', monospace; }
+.export-progress progress { width: 100%; height: 5px; margin-top: 7px; overflow: hidden; accent-color: var(--acid); }
+.export-error, .export-success { margin: 10px 0 0 !important; padding: 8px; border-radius: 3px; font-size: 9px !important; }
+.export-error { color: #ffd2ce !important; background: #71352c55; }
+.export-success { color: #d9efaa !important; background: #35472266; }
 
 @media (max-width: 1180px) {
   .workspace-grid { grid-template-columns: 220px minmax(330px, 1fr) 245px; }

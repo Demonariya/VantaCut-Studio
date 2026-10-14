@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.3",
+    "fix-webm-duration": "^1.0.6",
     "lucide-react": "^1.56.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

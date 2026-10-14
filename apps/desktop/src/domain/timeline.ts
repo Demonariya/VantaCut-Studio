@@ -32,6 +32,9 @@ export interface Clip {
   saturation: number
   opacity: number
   volume: number
+  muted?: boolean
+  linkGroupId?: string
+  enabled?: boolean
 }
 
 export interface Track {
@@ -40,6 +43,7 @@ export interface Track {
   kind: TrackKind
   locked: boolean
   muted: boolean
+  solo?: boolean
   hidden: boolean
 }
 
@@ -60,15 +64,19 @@ export interface Project {
 export type TimelineCommand =
   | { type: 'rename-project'; name: string }
   | { type: 'add-asset'; asset: MediaAsset }
-  | { type: 'update-asset'; assetId: string; values: Partial<Pick<MediaAsset, 'thumbnail' | 'width' | 'height'>> }
+  | { type: 'remove-asset'; assetId: string }
+  | { type: 'update-asset'; assetId: string; values: Partial<Pick<MediaAsset, 'name' | 'thumbnail' | 'width' | 'height'>> }
   | { type: 'add-clip'; clip: Clip }
+  | { type: 'add-clips'; clips: Clip[] }
+  | { type: 'add-track'; track: Track; index?: number }
+  | { type: 'remove-track'; trackId: string }
   | { type: 'delete-clip'; clipId: string }
-  | { type: 'split-clip'; clipId: string; atFrame: number; rightClipId: string }
+  | { type: 'split-clip'; clipId: string; atFrame: number; rightClipId: string; rightClipIds?: Record<string, string> }
   | { type: 'move-clip'; clipId: string; startFrame: number; trackId?: string }
   | { type: 'trim-clip'; clipId: string; edge: 'in' | 'out'; atFrame: number }
   | { type: 'ripple-delete'; clipId: string }
-  | { type: 'update-clip'; clipId: string; values: Partial<Pick<Clip, 'brightness' | 'contrast' | 'saturation' | 'opacity' | 'volume'>> }
-  | { type: 'update-track'; trackId: string; values: Partial<Pick<Track, 'name' | 'locked' | 'muted' | 'hidden'>> }
+  | { type: 'update-clip'; clipId: string; values: Partial<Pick<Clip, 'brightness' | 'contrast' | 'saturation' | 'opacity' | 'volume' | 'muted' | 'enabled' | 'linkGroupId'>> }
+  | { type: 'update-track'; trackId: string; values: Partial<Pick<Track, 'name' | 'locked' | 'muted' | 'solo' | 'hidden'>> }
 
 export interface History {
   past: Project[]
@@ -90,7 +98,7 @@ export function createProject(name = 'Untitled sequence'): Project {
     tracks: [
       { id: 'v1', name: 'V1', kind: 'video', locked: false, muted: false, hidden: false },
       { id: 'v2', name: 'V2', kind: 'video', locked: false, muted: false, hidden: false },
-      { id: 'a1', name: 'A1', kind: 'audio', locked: false, muted: false, hidden: false },
+      { id: 'a1', name: 'A1', kind: 'audio', locked: false, muted: false, solo: false, hidden: false },
     ],
     clips: [],
     updatedAt: now,
@@ -139,6 +147,20 @@ function canEditClip(project: Project, clip: Clip): boolean {
   return project.tracks.some((track) => track.id === clip.trackId && !track.locked)
 }
 
+function isValidClip(project: Project, clip: Clip): boolean {
+  const track = project.tracks.find((item) => item.id === clip.trackId)
+  const asset = project.assets.find((item) => item.id === clip.assetId)
+  if (!track || !asset || track.locked || (track.kind === 'video' && asset.kind === 'audio')
+    || (track.kind === 'audio' && asset.kind === 'image')) return false
+  return clip.durationFrames >= 1 && clip.sourceInFrame >= 0
+    && clip.sourceInFrame + clip.durationFrames <= asset.durationFrames
+}
+
+function linkedClips(project: Project, clip: Clip): Clip[] {
+  if (!clip.linkGroupId) return [clip]
+  return project.clips.filter((item) => item.linkGroupId === clip.linkGroupId)
+}
+
 export function applyCommand(project: Project, command: TimelineCommand): Project {
   switch (command.type) {
     case 'rename-project':
@@ -147,6 +169,9 @@ export function applyCommand(project: Project, command: TimelineCommand): Projec
       return project.assets.some((asset) => asset.id === command.asset.id)
         ? project
         : { ...project, assets: [...project.assets, command.asset], updatedAt: new Date().toISOString() }
+    case 'remove-asset':
+      if (project.clips.some((clip) => clip.assetId === command.assetId)) return project
+      return { ...project, assets: project.assets.filter((asset) => asset.id !== command.assetId), updatedAt: new Date().toISOString() }
     case 'update-asset': {
       const index = project.assets.findIndex((asset) => asset.id === command.assetId)
       if (index < 0) return project
@@ -156,77 +181,116 @@ export function applyCommand(project: Project, command: TimelineCommand): Projec
     }
     case 'add-clip': {
       if (project.clips.some((clip) => clip.id === command.clip.id)) return project
-      const track = project.tracks.find((item) => item.id === command.clip.trackId)
-      const asset = project.assets.find((item) => item.id === command.clip.assetId)
-      if (!track || !asset || track.locked || command.clip.durationFrames < 1
-        || (track.kind === 'audio') !== (asset.kind === 'audio')
-        || command.clip.sourceInFrame < 0
-        || command.clip.sourceInFrame + command.clip.durationFrames > asset.durationFrames) return project
+      if (!isValidClip(project, command.clip)) return project
       return { ...project, clips: [...project.clips, command.clip], updatedAt: new Date().toISOString() }
+    }
+    case 'add-clips': {
+      const ids = new Set(project.clips.map((clip) => clip.id))
+      for (const clip of command.clips) {
+        if (ids.has(clip.id) || !isValidClip(project, clip)) return project
+        ids.add(clip.id)
+      }
+      return { ...project, clips: [...project.clips, ...command.clips], updatedAt: new Date().toISOString() }
+    }
+    case 'add-track': {
+      if (project.tracks.some((track) => track.id === command.track.id)) return project
+      const tracks = [...project.tracks]
+      tracks.splice(Math.max(0, Math.min(command.index ?? tracks.length, tracks.length)), 0, command.track)
+      return { ...project, tracks, updatedAt: new Date().toISOString() }
+    }
+    case 'remove-track': {
+      const track = project.tracks.find((item) => item.id === command.trackId)
+      if (!track || project.tracks.filter((item) => item.kind === track.kind).length <= 1) return project
+      return {
+        ...project,
+        tracks: project.tracks.filter((item) => item.id !== command.trackId),
+        clips: project.clips.filter((clip) => clip.trackId !== command.trackId),
+        updatedAt: new Date().toISOString(),
+      }
     }
     case 'delete-clip': {
       const clip = project.clips.find((item) => item.id === command.clipId)
       if (!clip || !canEditClip(project, clip)) return project
-      return { ...project, clips: project.clips.filter((clip) => clip.id !== command.clipId), updatedAt: new Date().toISOString() }
+      const group = new Set(linkedClips(project, clip).map((item) => item.id))
+      return { ...project, clips: project.clips.filter((item) => !group.has(item.id)), updatedAt: new Date().toISOString() }
     }
     case 'split-clip': {
       const clip = project.clips.find((item) => item.id === command.clipId)
       if (!clip || !canEditClip(project, clip) || project.clips.some((item) => item.id === command.rightClipId)
         || command.atFrame <= clip.startFrame || command.atFrame >= clip.startFrame + clip.durationFrames) return project
-      const leftDuration = command.atFrame - clip.startFrame
-      const rightClip: Clip = {
-        ...clip,
-        id: command.rightClipId,
-        startFrame: command.atFrame,
-        sourceInFrame: clip.sourceInFrame + leftDuration,
-        durationFrames: clip.durationFrames - leftDuration,
-      }
-      return replaceClip({ ...project, clips: [...project.clips, rightClip] }, clip.id, (current) => ({ ...current, durationFrames: leftDuration }))
+      const group = linkedClips(project, clip)
+      if (group.length > 1 && group.some((item) => !canEditClip(project, item)
+        || (item.id !== clip.id && !command.rightClipIds?.[item.id]))) return project
+      const rightClips = group.map((item) => {
+        const leftDuration = command.atFrame - item.startFrame
+        return {
+          ...item,
+          id: item.id === clip.id ? command.rightClipId : command.rightClipIds?.[item.id] ?? '',
+          startFrame: command.atFrame,
+          sourceInFrame: item.sourceInFrame + leftDuration,
+          durationFrames: item.durationFrames - leftDuration,
+        }
+      })
+      if (rightClips.some((item) => !item.id || project.clips.some((existing) => existing.id === item.id))) return project
+      const groupIds = new Set(group.map((item) => item.id))
+      const leftClips = group.map((item) => ({ ...item, durationFrames: command.atFrame - item.startFrame }))
+      return { ...project, clips: [...project.clips.filter((item) => !groupIds.has(item.id)), ...leftClips, ...rightClips], updatedAt: new Date().toISOString() }
     }
     case 'move-clip': {
       const clip = project.clips.find((item) => item.id === command.clipId)
       const track = command.trackId ? project.tracks.find((item) => item.id === command.trackId) : undefined
       const asset = clip && project.assets.find((item) => item.id === clip.assetId)
       if (!clip || !canEditClip(project, clip) || (command.trackId && (!track || track.locked))
-        || (track && asset && ((track.kind === 'audio') !== (asset.kind === 'audio')))) return project
-      return replaceClip(project, command.clipId, (clip) => ({
-        ...clip,
-        startFrame: Math.max(0, Math.round(command.startFrame)),
-        trackId: command.trackId ?? clip.trackId,
-      }))
+        || (track?.kind === 'video' && asset?.kind === 'audio') || (track?.kind === 'audio' && asset?.kind === 'image')) return project
+      const delta = Math.max(0, Math.round(command.startFrame)) - clip.startFrame
+      const groupIds = new Set(linkedClips(project, clip).map((item) => item.id))
+      return {
+        ...project,
+        clips: project.clips.map((item) => !groupIds.has(item.id) ? item : {
+          ...item,
+          startFrame: Math.max(0, item.startFrame + delta),
+          trackId: item.id === clip.id ? command.trackId ?? item.trackId : item.trackId,
+        }),
+        updatedAt: new Date().toISOString(),
+      }
     }
     case 'trim-clip': {
       const clip = project.clips.find((item) => item.id === command.clipId)
       if (!clip || !canEditClip(project, clip)) return project
-      if (command.edge === 'in') {
-        const start = Math.max(Math.max(0, clip.startFrame - clip.sourceInFrame), Math.min(command.atFrame, clip.startFrame + clip.durationFrames - 1))
-        const delta = start - clip.startFrame
-        if (delta === 0) return project
-        return replaceClip(project, clip.id, (current) => ({
-          ...current,
-          startFrame: start,
-          sourceInFrame: current.sourceInFrame + delta,
-          durationFrames: current.durationFrames - delta,
-        }))
-      }
-      const asset = project.assets.find((item) => item.id === clip.assetId)
-      const sourceEnd = clip.startFrame + (asset?.durationFrames ?? clip.sourceInFrame + clip.durationFrames) - clip.sourceInFrame
-      const end = Math.max(clip.startFrame + 1, Math.min(command.atFrame, sourceEnd))
-      return end === clip.startFrame + clip.durationFrames
-        ? project
-        : replaceClip(project, clip.id, (current) => ({ ...current, durationFrames: end - current.startFrame }))
+      const group = linkedClips(project, clip)
+      if (group.some((item) => !canEditClip(project, item))) return project
+      const groupIds = new Set(group.map((item) => item.id))
+      const updated = group.map((item) => {
+        if (command.edge === 'in') {
+          const start = Math.max(Math.max(0, item.startFrame - item.sourceInFrame), Math.min(command.atFrame, item.startFrame + item.durationFrames - 1))
+          const delta = start - item.startFrame
+          return { ...item, startFrame: start, sourceInFrame: item.sourceInFrame + delta, durationFrames: item.durationFrames - delta }
+        }
+        const asset = project.assets.find((asset) => asset.id === item.assetId)
+        const sourceEnd = item.startFrame + (asset?.durationFrames ?? item.sourceInFrame + item.durationFrames) - item.sourceInFrame
+        const end = Math.max(item.startFrame + 1, Math.min(command.atFrame, sourceEnd))
+        return { ...item, durationFrames: end - item.startFrame }
+      })
+      if (updated.every((item, index) => item.startFrame === group[index].startFrame && item.durationFrames === group[index].durationFrames && item.sourceInFrame === group[index].sourceInFrame)) return project
+      return { ...project, clips: project.clips.map((item) => groupIds.has(item.id) ? updated.find((candidate) => candidate.id === item.id)! : item), updatedAt: new Date().toISOString() }
     }
     case 'ripple-delete': {
       const clip = project.clips.find((item) => item.id === command.clipId)
       if (!clip || !canEditClip(project, clip)) return project
-      const end = clip.startFrame + clip.durationFrames
+      const group = linkedClips(project, clip)
+      if (group.some((item) => !canEditClip(project, item))) return project
+      const removedIds = new Set(group.map((item) => item.id))
+      const rippleByTrack = new Map(group.map((item) => [item.trackId, item]))
       return {
         ...project,
         clips: project.clips
-          .filter((item) => item.id !== clip.id)
-          .map((item) => item.trackId === clip.trackId && item.startFrame >= end
-            ? { ...item, startFrame: item.startFrame - clip.durationFrames }
-            : item),
+          .filter((item) => !removedIds.has(item.id))
+          .map((item) => {
+            const removed = rippleByTrack.get(item.trackId)
+            return removed && item.startFrame >= removed.startFrame + removed.durationFrames
+              ? { ...item, startFrame: item.startFrame - removed.durationFrames }
+              : item
+          }),
         updatedAt: new Date().toISOString(),
       }
     }
