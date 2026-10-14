@@ -1,0 +1,40 @@
+:root {
+  font-family: 'Segoe UI Variable', 'Aptos', 'Trebuchet MS', sans-serif;
+  color: #d6d9dc;
+  background: #111315;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --canvas: #111315;
+  --surface-0: #151719;
+  --surface-1: #191c1e;
+  --surface-2: #1f2325;
+  --surface-3: #292e30;
+  --stroke: #2a2f31;
+  --stroke-soft: #222729;
+  --text-strong: #f2f3f3;
+  --text-main: #c7cbcd;
+  --text-muted: #82898d;
+  --text-dim: #60696d;
+  --acid: #c8ef6b;
+  --acid-soft: #a9cb56;
+  --cyan: #6acac2;
+  --video: #5dabc0;
+  --audio: #9ba1dc;
+  --radius: 4px;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { width: 100%; min-width: 360px; height: 100%; margin: 0; }
+body { overflow: hidden; }
+button, input { font: inherit; }
+button { color: inherit; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--acid); outline-offset: 2px; }
+button:disabled { cursor: not-allowed !important; opacity: .36; }
+::selection { color: #101310; background: var(--acid); }
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: #151819; }
+::-webkit-scrollbar-thumb { background: #3b4245; border: 2px solid #151819; border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: #515a5d; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
